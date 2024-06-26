@@ -9,8 +9,6 @@ class model():
         self.numberOfParticles = numberOfParticles
         self.domainSize = np.asarray(domainSize)
         # parameters of the model
-
-
         pass
 
     def simulate(self, initialState=(None, None), dt=None, tmax=None):

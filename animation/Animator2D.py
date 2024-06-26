@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-import Animator
+import animation.Animator as Animator
 
 class Animator2D(Animator.Animator):
     """

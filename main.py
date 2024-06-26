@@ -1,27 +1,25 @@
 import numpy as np 
 import matplotlib.pyplot as plt
-
+import seaborn as sns
+import sys
 import pandas as pd
-import vicsek
+
+# Import models 
+import models.vicsek as vicsek
+
 
 from utils import *
 
-import Animator2D
-import MatplotlibAnimator
+
+import animation.Animator2D as Animator2D
+import animation.MatplotlibAnimator as MatplotlibAnimator
 
 
 
 if __name__ == "__main__":
-    simulator = vicsek.Vicsek(domainSize=(50,50), numberOfParticles=1000)
+    simulator = vicsek.Vicsek(domainSize=(50,50), numberOfParticles=50)
     simulationData = simulator.simulate()
-
-
-    # print(simulationData[0].shape)
-    # print(simulationData[1])
-    # print(simulationData[1].shape)
-    # print(simulationData[2].shape)
-
-    save_path = 'vicsek_simulation.csv'
+    save_path = 'data/vicsek_simulation.csv'
     simulationDataToCSV(simulationData, save_path)
 
     """
@@ -38,11 +36,11 @@ if __name__ == "__main__":
     Execute and save the animation as an mp4.
 
     Optionally: (this requires ffmpeg)
-    preparedAnimator.saveAnimation('vicsek2.mp4')
+    preparedAnimator.saveAnimation('data/vicsek2.mp4')
     """
 
     """
     After saving the animation we can also show it directly.
     """
-    preparedAnimator.saveAnimation('vicsek2.mp4')
+    preparedAnimator.saveAnimation('data/vicsek2.mp4')
 

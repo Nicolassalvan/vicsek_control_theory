@@ -2,7 +2,7 @@
 
 
 import numpy as np
-import model
+import models.model as model
 
 
 class Vicsek(model.model):
