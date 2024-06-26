@@ -13,4 +13,8 @@ class model():
 
     def simulate(self, initialState=(None, None), dt=None, tmax=None):
         pass
+    #   return dt*np.arange(nt), positionsHistory, orientationsHistory # others can be added
+    # I advice you to stock the return in a res variable, and then separate it into t, positionsHistory, orientationsHistory 
+    # and others 
+
 
