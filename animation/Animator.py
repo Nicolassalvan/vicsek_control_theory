@@ -1,6 +1,8 @@
 from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 import matplotlib.animation as animator
+from IPython.display import HTML, Video, display
+import tempfile
 
 class Animator(object):
     
@@ -73,5 +75,18 @@ class Animator(object):
         self.animation = FuncAnimation(self._figure, self._animate, interval=self._interval, frames = self._frames)
 
         return self.animation
-
  
+
+    def showAnimationInNotebook(self):
+        """
+        Generates and displays the animation as an HTML5 video in a Jupyter notebook.
+
+        returns
+        self
+        """
+        animation = self._getAnimation()
+        plt.show()
+        html_video = animation.to_html5_video()
+        display(HTML(html_video))
+        
+        return self
