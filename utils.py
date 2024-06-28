@@ -6,6 +6,9 @@ Created on Fri Jun 21 15:11:06 2024
 import numpy as np
 import pandas as pd 
 from scipy import integrate
+from sklearn.preprocessing import StandardScaler
+from sklearn import cluster
+import matplotlib.pyplot as plt
 
 # ============================================================================= #
 # =============================== Model functions ============================= #
@@ -37,16 +40,90 @@ def smallest_angle_between_vectors(angle1, angle2):
 # ============================= Coefficients, ... ============================= #
 # ============================================================================= #
 
+def average_orientation(df):
+    """
+    Computes the average orientation of the birds in the simulation at each time step and returns it as a numpy array.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The simulation data.
+
+    Returns
+    -------
+    np.ndarray
+        The average orientation of the birds at each time step. 
+    """
+    df_orient = extract_orientations_from_dataframe(df)
+    theta_x = df_orient.filter(like="theta_x").to_numpy()
+    theta_y = df_orient.filter(like="theta_y").to_numpy()
+    angle = np.arctan2(theta_y, theta_x)
+    angle_mean = np.mean(angle, axis=1)
+    return angle_mean
+
+# def order_factor(df):
+#     df_orient = extract_orientations_from_dataframe(df)
+#     df_orient['order_factor'] = np.sqrt(df_orient.filter(like="theta_x").mean(axis=1)**2 + df_orient.filter(like="theta_y").mean(axis=1)**2)
+#     return df_orient['order_factor']
+
+# def stationnary_order_factor(df):
+#     df_order = order_factor(df)
+#     order = df_order.to_numpy()
+#     int_order = integrate.quad(order, df['t'], initial=0)
+
 def order_factor(df):
-    df_orient = utils.extract_orientations_from_dataframe(df)
-    df_orient['order_factor'] = np.sqrt(df_orient.filter(like="theta_x").mean(axis=1)**2 + df_orient.filter(like="theta_y").mean(axis=1)**2)
-    return df_orient['order_factor']
+    df_orient = extract_orientations_from_dataframe(df)
+    truc = df_orient.filter(like="theta_x").mean(axis=1)
+    res = np.sqrt(df_orient.filter(like="theta_x").mean(axis=1)**2 + df_orient.filter(like="theta_y").mean(axis=1)**2)
+    return res
+
 
 def stationnary_order_factor(df):
-    df_order = order_factor(df)
-    order = df_order.to_numpy()
-    int_order = integrate.quad(order, df['t'], initial=0)
+    """
+    Compute the stationnary order factor of the flock using Simpson integration.
+    """
+    tmax = df['t'].iloc[-1]
+    order = order_factor(df)
+    x = np.linspace(0, tmax, len(order))
+    int_order = integrate.simpson(order, x=x) 
+    return int_order/tmax
 
+
+# ============================================================================= #
+# =============================  Data clustering  ============================= #
+# ============================================================================= #
+
+def naive_clustering_labels_positions(df, i, threshold=0.3, min_samples=5):
+    scaler = StandardScaler()
+    df_pos = get_positions(df, i)
+    df_pos_scaled = scaler.fit_transform(df_pos)
+    db_pos = cluster.DBSCAN(eps=threshold, min_samples=min_samples).fit(df_pos_scaled)
+    return db_pos.labels_
+
+def naive_clustering_labels_orientations(df, i, threshold=0.3, min_samples=5):
+    scaler = StandardScaler()
+    df_orient = get_orientations(df, i)
+    df_orient_scaled = scaler.fit_transform(df_orient)
+    db_orient = cluster.DBSCAN(eps=threshold, min_samples=min_samples).fit(df_orient_scaled)
+    return db_orient.labels_
+
+def naive_clustering_labels_positions_and_orientations(df, i, threshold=0.3, min_samples=5):
+    scaler = StandardScaler()
+    df_all = get_positions_and_orientations(df, i)
+    df_all_scaled = scaler.fit_transform(df_all)
+    db_all = cluster.DBSCAN(eps=threshold, min_samples=min_samples).fit(df_all_scaled)
+    return db_all.labels_
+
+def clustering_labels_stats(labels):
+    n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
+    n_noise = list(labels).count(-1)
+    return n_clusters_, n_noise
+
+def coloring_clusters(labels, cmap_name='rainbow'):
+    n = len(set(labels))
+    cmap = plt.get_cmap(cmap_name)
+    colors = cmap(labels+1 / max(labels+1))
+    return pd.DataFrame(colors)
 
 # ============================================================================= #
 # ============================= Data manipulation ============================= #
@@ -142,3 +219,21 @@ def extract_orientations_from_dataframe(df):
     """
     orientations = df.iloc[:,1+2*df.shape[1]//4:]
     return orientations 
+
+def get_positions(df, i):
+    pos = extract_positions_from_dataframe(df)
+    list_pos = pos.iloc[i].to_numpy().reshape(-1, 2)
+    df_pos = pd.DataFrame(list_pos, columns=['x', 'y'])
+    return df_pos
+
+def get_orientations(df, i):
+    orient = extract_orientations_from_dataframe(df)
+    list_orient = orient.iloc[i].to_numpy().reshape(-1, 2)
+    df_orient = pd.DataFrame(list_orient, columns=['theta_x', 'theta_y'])
+    return df_orient
+
+def get_positions_and_orientations(df, i):
+    pos = get_positions(df, i)
+    orient = get_orientations(df, i)
+    df_all = pd.DataFrame(np.concatenate((pos, orient), axis=1), columns=['x', 'y', 'theta_x', 'theta_y'])
+    return df_all
