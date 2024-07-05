@@ -24,3 +24,4 @@ class Animator2D(Animator.Animator):
         plt.xlim(0,self._domainSize[0])
         plt.ylim(0,self._domainSize[1])
         plt.title('$t$=%2.2f' % self._time[i])
+        

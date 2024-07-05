@@ -9,6 +9,8 @@ from scipy import integrate
 from sklearn.preprocessing import StandardScaler
 from sklearn import cluster
 import matplotlib.pyplot as plt
+from numba import jit
+from sklearn.neighbors import NearestNeighbors
 
 # ============================================================================= #
 # =============================== Model functions ============================= #
@@ -93,6 +95,24 @@ def stationnary_order_factor(df):
 # =============================  Data clustering  ============================= #
 # ============================================================================= #
 
+@jit(nopython=True)
+def distance_periodic_scaled(X, Y, periods):
+    dims = periods.shape[0]
+    n = X.shape[0]
+    dist = 0 
+    for d in range(dims):
+        dist += (np.abs(X[d] - Y[d]) / periods[d])**2
+    return np.sqrt(dist)
+
+@jit(nopython=True)
+def distance_periodic(X, Y, periods):
+    dims = periods.shape[0]
+    n = X.shape[0]
+    dist = 0 
+    for d in range(dims):
+        dist += (np.abs(X[d] - Y[d]))**2
+    return np.sqrt(dist)
+
 def naive_clustering_labels_positions(df, i, threshold=0.3, min_samples=5):
     scaler = StandardScaler()
     df_pos = get_positions(df, i)
@@ -102,8 +122,8 @@ def naive_clustering_labels_positions(df, i, threshold=0.3, min_samples=5):
 
 def naive_clustering_labels_orientations(df, i, threshold=0.3, min_samples=5):
     scaler = StandardScaler()
-    df_orient = get_orientations(df, i)
-    df_orient_scaled = scaler.fit_transform(df_orient)
+    df_orient = get_angles(df, i)
+    df_orient_scaled = scaler.fit_transform(df_orient.to_numpy().reshape(-1, 1))
     db_orient = cluster.DBSCAN(eps=threshold, min_samples=min_samples).fit(df_orient_scaled)
     return db_orient.labels_
 
@@ -114,16 +134,50 @@ def naive_clustering_labels_positions_and_orientations(df, i, threshold=0.3, min
     db_all = cluster.DBSCAN(eps=threshold, min_samples=min_samples).fit(df_all_scaled)
     return db_all.labels_
 
+
 def clustering_labels_stats(labels):
+    """
+    Computes the number of clusters and the number of noise points in the clustering.
+
+    Parameters
+    ----------
+    labels : np.ndarray
+        Labels of the clustering.
+
+    Returns
+    -------
+    n_clusters_ : int
+        Number of clusters.
+    n_noise : int   
+        Number of noise points.
+    """
     n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
     n_noise = list(labels).count(-1)
     return n_clusters_, n_noise
+
+
 
 def coloring_clusters(labels, cmap_name='rainbow'):
     n = len(set(labels))
     cmap = plt.get_cmap(cmap_name)
     colors = cmap(labels+1 / max(labels+1))
     return pd.DataFrame(colors)
+
+
+def neighbours_heuristic(X, periods, n_neighbours, quantile = 0.95, plot = False, metric_func = distance_periodic):
+    neighbours = NearestNeighbors(n_neighbors=10, metric=metric_func, metric_params={'periods': periods})
+    neighbours.fit(X)
+    dist, index = neighbours.kneighbors(X)
+    distances = np.sort(dist[:, -1])
+    eps = distances[int(quantile * len(distances))]
+    if plot:
+        plt.plot(distances)
+        plt.title('K-distance Graph')
+        plt.xlabel('Points')
+        plt.ylabel('Distance')
+        plt.title(f'K-distance Graph - eps = {eps : .3f}')
+        plt.show()
+    return eps
 
 # ============================================================================= #
 # ============================= Data manipulation ============================= #
@@ -237,3 +291,15 @@ def get_positions_and_orientations(df, i):
     orient = get_orientations(df, i)
     df_all = pd.DataFrame(np.concatenate((pos, orient), axis=1), columns=['x', 'y', 'theta_x', 'theta_y'])
     return df_all
+
+def get_positions_and_angles(df, i):
+    pos = get_positions(df, i)
+    orient = get_orientations(df, i)
+    angle = np.arctan2(orient['theta_y'], orient['theta_x']) + np.pi
+    df_all = pd.DataFrame(np.concatenate((pos, angle[:,np.newaxis]), axis=1), columns=['x', 'y', 'angle'])
+    return df_all
+
+def get_angles(df, i):
+    orient = get_orientations(df, i)
+    angle = np.arctan2(orient['theta_y'], orient['theta_x']) + np.pi
+    return angle

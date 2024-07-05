@@ -160,7 +160,10 @@ def plot_order_factor(df):
 
 def plot_clusters(df, i, L=50,
                     method = 'position',
-                    cmap_name='rainbow'):
+                    cmap_name='rainbow',
+                    eps=0.3, 
+                    min_samples=5,
+                    custom_labels=None):
 
     """
     Plot the simulation showing the clusters of birds at iteration i.
@@ -180,13 +183,19 @@ def plot_clusters(df, i, L=50,
     theta_x, theta_y = list_orient[:,0], list_orient[:,1]
 
     # Number of clusters in labels, ignoring noise if present.
-    if method == 'position':
-        labels = utils.naive_clustering_labels_positions(df, i)
-    elif method == 'orientation':
-        labels = utils.naive_clustering_labels_orientations(df, i)
-    else :
-        labels = utils.naive_clustering_labels_positions_and_orientations(df, i)
+    if custom_labels is not None:
+        labels = custom_labels
+    else:
+        if method == 'position':
+            labels = utils.naive_clustering_labels_positions(df, i, threshold=eps, min_samples=min_samples)
+        elif method == 'orientation':
+            labels = utils.naive_clustering_labels_orientations(df, i, threshold=eps, min_samples=min_samples)
+        else :
+            labels = utils.naive_clustering_labels_positions_and_orientations(df, i, threshold=eps, min_samples=min_samples)
 
+    
+    n_clust, n_noise = utils.clustering_labels_stats(labels)
+    print(f'Number of clusters: {n_clust}, Number of noise points: {n_noise}, Total : {n_bird}')
     colors = utils.coloring_clusters(labels, cmap_name).to_numpy()
     fig, ax = plt.subplots()
     ax.quiver(x,y,theta_x,theta_y, color = colors, cmap=cmap_name)
@@ -199,7 +208,10 @@ def plot_clusters(df, i, L=50,
 
 def plot_clusters_kde(df, i, L=50,
                     method = 'position',
-                    cmap_name='rainbow'):
+                    cmap_name='rainbow',
+                    eps=0.3, 
+                    min_samples=5,
+                    custom_labels=None):
 
     """
     Plot the clusters of the birds using a kernel density estimation.
@@ -219,12 +231,15 @@ def plot_clusters_kde(df, i, L=50,
     theta_x, theta_y = list_orient[:,0], list_orient[:,1]
 
     # Number of clusters in labels, ignoring noise if present.
-    if method == 'position':
-        labels = utils.naive_clustering_labels_positions(df, i)
-    elif method == 'orientation':
-        labels = utils.naive_clustering_labels_orientations(df, i)
-    else :
-        labels = utils.naive_clustering_labels_positions_and_orientations(df, i)
+    if custom_labels is not None:
+        labels = custom_labels
+    else:
+        if method == 'position':
+            labels = utils.naive_clustering_labels_positions(df, i, threshold=eps, min_samples=min_samples)
+        elif method == 'orientation':
+            labels = utils.naive_clustering_labels_orientations(df, i, threshold=eps, min_samples=min_samples)
+        else :
+            labels = utils.naive_clustering_labels_positions_and_orientations(df, i, threshold=eps, min_samples=min_samples)
 
     colors = utils.coloring_clusters(labels, cmap_name).to_numpy()
     fig, ax = plt.subplots()
