@@ -158,96 +158,49 @@ def plot_order_factor(df):
 
 ### Clustering visualisation ###
 
-def plot_clusters(df, i, L=50,
-                    method = 'position',
-                    cmap_name='rainbow',
-                    eps=0.3, 
-                    min_samples=5,
-                    custom_labels=None):
+def plot_clusters(df, i, labels, title=None, L=50,
+                    cmap_name='rainbow', kde=True):
 
     """
     Plot the simulation showing the clusters of birds at iteration i.
     """
-    if method not in ['position', 'orientation', 'both']:
-        raise ValueError('method should be either "position", "orientation" or "both"')
 
+    ### EXTRACTING THE DATA ###
+
+    # Extract the positions and orientations of the birds at iteration i.
     df_pos = utils.extract_positions_from_dataframe(df).iloc[i]
     df_orient = utils.extract_orientations_from_dataframe(df).iloc[i]
-
+    # Extract the number of birds 
     n_bird = len(df_pos)//2
-    
+
+    # Convert the dataframes to numpy arrays.
     list_pos = df_pos.to_numpy().reshape((n_bird, 2))
     list_orient = df_orient.to_numpy().reshape((n_bird, 2))
-
+    # Extract the x and y coordinates of the birds, and the theta_x and theta_y components of their orientations.
     x, y = list_pos[:,0], list_pos[:,1]
     theta_x, theta_y = list_orient[:,0], list_orient[:,1]
-
-    # Number of clusters in labels, ignoring noise if present.
-    if custom_labels is not None:
-        labels = custom_labels
-    else:
-        if method == 'position':
-            labels = utils.naive_clustering_labels_positions(df, i, threshold=eps, min_samples=min_samples)
-        elif method == 'orientation':
-            labels = utils.naive_clustering_labels_orientations(df, i, threshold=eps, min_samples=min_samples)
-        else :
-            labels = utils.naive_clustering_labels_positions_and_orientations(df, i, threshold=eps, min_samples=min_samples)
-
     
-    n_clust, n_noise = utils.clustering_labels_stats(labels)
-    print(f'Number of clusters: {n_clust}, Number of noise points: {n_noise}, Total : {n_bird}')
+    ### PLOTTING THE SIMULATION ###
+
+    # Coloring the birds according to their cluster.
     colors = utils.coloring_clusters(labels, cmap_name).to_numpy()
+    # Setting the title of the plot.
+    if title is None:
+        title = f'Simulation at the iteration i={i}'
+    alpha = 1 # transparency of the arrows if kde is False
+
+    # Plot the simulation.
     fig, ax = plt.subplots()
-    ax.quiver(x,y,theta_x,theta_y, color = colors, cmap=cmap_name)
-    ax.set_title(f'Simulation à l\' itération i={i} avec clusters (méthode \'{method}\')')
+    if kde : 
+        # kde without noise? 
+        ax = sns.kdeplot(x=x, y=y, fill=True, hue = labels, alpha=0.5, palette=cmap_name, legend=False)
+        # ax = sns.kdeplot(x=x, y=y, fill=True, alpha=0.5, palette=cmap_name, legend=False)
+        alpha = 0.5 # transparency of the arrows if kde is True
+    ax.quiver(x,y,theta_x,theta_y, color = colors, cmap=cmap_name, alpha=alpha)
+    ax.set_title(title, fontsize=10)
     ax.set_xlim(0, L)
     ax.set_ylim(0, L)
     ax.set_aspect(True)
     plt.show()
-    return fig, ax
-
-def plot_clusters_kde(df, i, L=50,
-                    method = 'position',
-                    cmap_name='rainbow',
-                    eps=0.3, 
-                    min_samples=5,
-                    custom_labels=None):
-
-    """
-    Plot the clusters of the birds using a kernel density estimation.
-    """
-    if method not in ['position', 'orientation', 'both']:
-        raise ValueError('method should be either "position", "orientation" or "both"')
-
-    df_pos = utils.extract_positions_from_dataframe(df).iloc[i]
-    df_orient = utils.extract_orientations_from_dataframe(df).iloc[i]
-
-    n_bird = len(df_pos)//2
     
-    list_pos = df_pos.to_numpy().reshape((n_bird, 2))
-    list_orient = df_orient.to_numpy().reshape((n_bird, 2))
-
-    x, y = list_pos[:,0], list_pos[:,1]
-    theta_x, theta_y = list_orient[:,0], list_orient[:,1]
-
-    # Number of clusters in labels, ignoring noise if present.
-    if custom_labels is not None:
-        labels = custom_labels
-    else:
-        if method == 'position':
-            labels = utils.naive_clustering_labels_positions(df, i, threshold=eps, min_samples=min_samples)
-        elif method == 'orientation':
-            labels = utils.naive_clustering_labels_orientations(df, i, threshold=eps, min_samples=min_samples)
-        else :
-            labels = utils.naive_clustering_labels_positions_and_orientations(df, i, threshold=eps, min_samples=min_samples)
-
-    colors = utils.coloring_clusters(labels, cmap_name).to_numpy()
-    fig, ax = plt.subplots()
-    ax = sns.kdeplot(x=x, y=y, fill=False, hue = labels, alpha=0.5)
-    ax.quiver(x,y,theta_x,theta_y, color = colors, cmap=cmap_name, alpha=0.5)
-
-    ax.set_xlim(0, L)
-    ax.set_ylim(0, L)
-    ax.set_aspect(True)
-    plt.show()
     return fig, ax

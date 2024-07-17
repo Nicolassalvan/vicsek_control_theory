@@ -104,13 +104,17 @@ def distance_periodic_scaled(X, Y, periods):
         dist += (np.abs(X[d] - Y[d]) / periods[d])**2
     return np.sqrt(dist)
 
+# Position matrix
 @jit(nopython=True)
 def distance_periodic(X, Y, periods):
     dims = periods.shape[0]
     n = X.shape[0]
     dist = 0 
     for d in range(dims):
-        dist += (np.abs(X[d] - Y[d]))**2
+        delta = np.abs(X[d] - Y[d])
+        if delta > periods[d] / 2:
+            delta = periods[d] - delta
+        dist += (delta)**2
     return np.sqrt(dist)
 
 def naive_clustering_labels_positions(df, i, threshold=0.3, min_samples=5):
@@ -133,6 +137,27 @@ def naive_clustering_labels_positions_and_orientations(df, i, threshold=0.3, min
     df_all_scaled = scaler.fit_transform(df_all)
     db_all = cluster.DBSCAN(eps=threshold, min_samples=min_samples).fit(df_all_scaled)
     return db_all.labels_
+
+
+def periodic_clustering_labels_positions(df, i, k_coef, L, min_samples=5):
+    list_pos = get_positions(df, i).to_numpy()
+    N = len(list_pos)
+
+    rho = N / L**2
+    threshold = np.sqrt(min_samples / (np.pi * rho * k_coef))
+    #compute the distance matrix
+    # t_mat_start = time.time()
+    dist_mat = np.zeros((N, N))
+    for i in range(N):
+        for j in range(i):
+            dist_mat[i, j] = distance_periodic(list_pos[i], list_pos[j], np.array([L, L]))
+            dist_mat[j, i] = dist_mat[i, j]
+    # t_mat_end = time.time()
+    db_pos = cluster.DBSCAN(eps=threshold, min_samples=min_samples, metric = 'precomputed').fit(dist_mat)
+    # t_db_end = time.time()
+    # print(f"Time for distance matrix computation: {t_mat_end - t_mat_start}")
+    # print(f"Time for DBSCAN: {t_db_end - t_mat_end}")
+    return db_pos.labels_
 
 
 def clustering_labels_stats(labels):
@@ -161,9 +186,10 @@ def coloring_clusters(labels, cmap_name='rainbow'):
     n = len(set(labels))
     cmap = plt.get_cmap(cmap_name)
     colors = cmap(labels+1 / max(labels+1))
+    colors[labels == -1] = [0, 0, 0, 1]
     return pd.DataFrame(colors)
 
-
+# DOESNT WORK
 def neighbours_heuristic(X, periods, n_neighbours, quantile = 0.95, plot = False, metric_func = distance_periodic):
     neighbours = NearestNeighbors(n_neighbors=10, metric=metric_func, metric_params={'periods': periods})
     neighbours.fit(X)
@@ -238,6 +264,37 @@ def _headerSimulationData(flockSize):
     return header
 
 
+def clusters_over_time(df, func=periodic_clustering_labels_positions, **kwargs):
+    """
+    Computes the labels of the clusters over time, using the given function. 
+
+    Parameters:
+    -----------
+    df: pd.DataFrame
+        The dataframe containing the simulation data.
+    func: function
+        The function to use to compute the labels. Must take the dataframe and the iteration as arguments.
+    kwargs: dict
+        The arguments to pass to the function.
+
+    Returns:
+    --------
+    df_labels: pd.DataFrame
+        The dataframe containing the labels of the clusters over time.
+    """
+    N = (df.shape[1] - 1) // 4 # x,y,v_x,v_y 
+    t = df.shape[0]
+    matLabels = np.zeros((t, N), dtype=int)
+
+    for i in range(t):
+        # df3 = pd.DataFrame(df.loc[i]).transpose()
+        labels = func(df, i, **kwargs)
+        matLabels[i] = labels
+
+    # store in dataframe
+    df_labels = pd.DataFrame(matLabels) 
+    return df_labels
+
 def extract_positions_from_dataframe(df):
     """
     Extract positions from a dataframe.
@@ -302,4 +359,4 @@ def get_positions_and_angles(df, i):
 def get_angles(df, i):
     orient = get_orientations(df, i)
     angle = np.arctan2(orient['theta_y'], orient['theta_x']) + np.pi
-    return angle
+    return pd.DataFrame(angle, columns=['angle'])
