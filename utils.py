@@ -95,6 +95,7 @@ def stationnary_order_factor(df):
 # =============================  Data clustering  ============================= #
 # ============================================================================= #
 
+### Distance computing 
 @jit(nopython=True)
 def distance_periodic_scaled(X, Y, periods):
     dims = periods.shape[0]
@@ -104,7 +105,7 @@ def distance_periodic_scaled(X, Y, periods):
         dist += (np.abs(X[d] - Y[d]) / periods[d])**2
     return np.sqrt(dist)
 
-# Position matrix
+
 @jit(nopython=True)
 def distance_periodic(X, Y, periods):
     dims = periods.shape[0]
@@ -117,6 +118,7 @@ def distance_periodic(X, Y, periods):
         dist += (delta)**2
     return np.sqrt(dist)
 
+### Clustering functions - Create labels for the clustering
 def naive_clustering_labels_positions(df, i, threshold=0.3, min_samples=5):
     scaler = StandardScaler()
     df_pos = get_positions(df, i)
@@ -159,7 +161,30 @@ def periodic_clustering_labels_positions(df, i, k_coef, L, min_samples=5):
     # print(f"Time for DBSCAN: {t_db_end - t_mat_end}")
     return db_pos.labels_
 
+def periodic_clustering_labels_pos_ang(df, i, k_coef, L, delta_theta, min_samples=5):
+    list_pos = get_positions(df, i).to_numpy()
+    list_ang = get_angles(df, i).to_numpy()
+    list_pos_ang = np.concatenate((list_pos, list_ang), axis=1)
+    N = len(list_pos)
 
+    rho = N / L**2
+    threshold = np.sqrt(delta_theta**2 + min_samples / (np.pi * rho * k_coef))
+
+    #compute the distance matrix
+    # t_mat_start = time.time()
+    dist_mat = np.zeros((N, N))
+    for i in range(N):
+        for j in range(i):
+            dist_mat[i, j] = distance_periodic(list_pos_ang[i], list_pos_ang[j], np.array([L, L, 2 * np.pi]))
+            dist_mat[j, i] = dist_mat[i, j]
+    # t_mat_end = time.time()
+    db_pos = cluster.DBSCAN(eps=threshold, min_samples=min_samples, metric = 'precomputed').fit(dist_mat)
+    # t_db_end = time.time()
+    # print(f"Time for distance matrix computation: {t_mat_end - t_mat_start}")
+    # print(f"Time for DBSCAN: {t_db_end - t_mat_end}")
+    return db_pos.labels_
+
+### Clustering functions - Utils  
 def clustering_labels_stats(labels):
     """
     Computes the number of clusters and the number of noise points in the clustering.
@@ -181,7 +206,6 @@ def clustering_labels_stats(labels):
     return n_clusters_, n_noise
 
 
-
 def coloring_clusters(labels, cmap_name='rainbow'):
     n = len(set(labels))
     cmap = plt.get_cmap(cmap_name)
@@ -189,7 +213,7 @@ def coloring_clusters(labels, cmap_name='rainbow'):
     colors[labels == -1] = [0, 0, 0, 1]
     return pd.DataFrame(colors)
 
-# DOESNT WORK
+# DOESNT WORK YET
 def neighbours_heuristic(X, periods, n_neighbours, quantile = 0.95, plot = False, metric_func = distance_periodic):
     neighbours = NearestNeighbors(n_neighbors=10, metric=metric_func, metric_params={'periods': periods})
     neighbours.fit(X)
@@ -209,6 +233,7 @@ def neighbours_heuristic(X, periods, n_neighbours, quantile = 0.95, plot = False
 # ============================= Data manipulation ============================= #
 # ============================================================================= #
 
+### Data manipulation - Utils for the simulation data
 def simulationDataToCSV(simulationData, save_path):
     """
     Save simulation data to a CSV file.
@@ -263,7 +288,7 @@ def _headerSimulationData(flockSize):
     header = header[:-1]
     return header
 
-
+### Data manipulation - Utils for the clustering data
 def clusters_over_time(df, func=periodic_clustering_labels_positions, **kwargs):
     """
     Computes the labels of the clusters over time, using the given function. 
@@ -295,6 +320,7 @@ def clusters_over_time(df, func=periodic_clustering_labels_positions, **kwargs):
     df_labels = pd.DataFrame(matLabels) 
     return df_labels
 
+### Data manipulation - Extract columns from the dataframe
 def extract_positions_from_dataframe(df):
     """
     Extract positions from a dataframe.
@@ -331,6 +357,7 @@ def extract_orientations_from_dataframe(df):
     orientations = df.iloc[:,1+2*df.shape[1]//4:]
     return orientations 
 
+### Data manipulation - Get positions and orientations from the dataframe
 def get_positions(df, i):
     pos = extract_positions_from_dataframe(df)
     list_pos = pos.iloc[i].to_numpy().reshape(-1, 2)
@@ -356,7 +383,23 @@ def get_positions_and_angles(df, i):
     df_all = pd.DataFrame(np.concatenate((pos, angle[:,np.newaxis]), axis=1), columns=['x', 'y', 'angle'])
     return df_all
 
-def get_angles(df, i):
+def get_angles(df:pd.DataFrame, i:int)->pd.DataFrame:
+    """
+    Get the angles of the birds at a given time step i. The angle is computed as the arctan2 of the y and x components of the orientation
+    and is shifted by pi to have the angle in [0, 2*pi].
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The simulation data.
+    i : int
+        The time step.
+    
+    Returns
+    -------
+    pd.DataFrame
+        The angles of the birds at the time step i.
+    """
     orient = get_orientations(df, i)
     angle = np.arctan2(orient['theta_y'], orient['theta_x']) + np.pi
     return pd.DataFrame(angle, columns=['angle'])
