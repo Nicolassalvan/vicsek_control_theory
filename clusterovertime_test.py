@@ -19,87 +19,40 @@ import utils
 import animation.Animator2D as Animator2D
 import animation.MatplotlibAnimator as MatplotlibAnimator
 
+
+### === Constants === ###
 # True if we want to print debug information
 DEBUG = False
 
 NoneFlock = -2
+DeadFlock = -3
+
+contributionThreshlod = 0.
 
 
-
-
-def optimal_assignment(labels_before, labels_after):
-    """
-    Optimal assignment of the clusters from the previous frame to the next frame. If the data is unbalanced, 
-    we add imaginary clusters to make the cost matrix square. Then, we use the Hungarian algorithm to find the optimal
-    assignment of the clusters from the previous frame to the next frame. 
-    
-    The imaginary clusters are labeled -2. The noise cluster is labeled -1. 
-    
-    Parameters
-    ----------
-    labels_before : numpy array
-        Labels of the clusters in the previous frame
-    labels_after : numpy array
-        Labels of the clusters in the next frame
-        
-    Returns  
-    -------
-    labels_before_assigned : numpy array
-        Labels of the clusters in the previous frame after the optimal assignment
-    labels_after_assigned : numpy array
-        Labels of the clusters in the next frame after the optimal assignment   
-    contribution : numpy array
-        Contribution of each cluster to the next frame after the optimal assignment
-    """
-    if DEBUG:
-        print("Optimal assignment...")
-    label_list_before = list(set(labels_before))
-    label_list_after = list(set(labels_after))
-    if -1 in label_list_before:
-        label_list_before.remove(-1)
-    if -1 in label_list_after:
-        label_list_after.remove(-1)
-
-    # Corner cases : no cluster in the previous or next frame
-    if len(label_list_after) == 0:
-        # No cluster in the next frame
-        return labels_before, np.repeat(NoneFlock, len(labels_before)), np.zeros(len(labels_before))
-    
-    if len(label_list_before) == 0:
-        # No cluster in the previous frame
-        return np.repeat(NoneFlock, len(labels_after)), labels_after, np.zeros(len(labels_after))
-    # label_list_before.remove(-1) # Remove the noise label
-    # label_list_after.remove(-1) # Remove the noise label
-
-    if DEBUG:
-        print("Labels before: ", label_list_before)
-        print("Labels after: ", label_list_after)
-
-    # Count the clusters 
-    n_cluster_before = len(set(labels_before)) - 1
-    n_cluster_after = len(set(labels_after)) - 1
-
-    # we use counters because the labels are keys to the dictionary of the counter
-    cluster_counts_after = Counter(labels_after)
-    if DEBUG: 
-        print("# Cluster sizes after: \n", cluster_counts_after)
-        print("Noise count after", cluster_counts_after[-1])
-
-    # Count the number of clusters
+def contribution_matrix(labels_before, labels_after):
+        ### === Cost matrix computation === ###
+    # Counter matrix : number of elements of i in j 
     df_crosstab = pd.crosstab(pd.Series(labels_before), pd.Series(labels_after))
     if DEBUG:
         print("# Count matrix: \n", df_crosstab)
 
     # Delete noise column and line 
-    count_matrix = df_crosstab.drop(-1, axis=0)
-    count_matrix = count_matrix.drop(-1, axis=1)
+    count_matrix = df_crosstab
+
+    if -1 in df_crosstab.columns:
+        count_matrix = count_matrix.drop(-1, axis=1)
+    if -1 in df_crosstab.index:
+        count_matrix = count_matrix.drop(-1, axis=0)
     labels_after_assigned = count_matrix.columns.to_numpy()
     labels_before_assigned = count_matrix.index.to_numpy()
+
     if DEBUG: 
         print("# Count matrix after deletion: \n", count_matrix)
         print("Column names: ", labels_after_assigned)
         print("Index names: ", labels_before_assigned)
 
+    cluster_counts_after = Counter(labels_after)
     # List of the number of clusters in the next frame to compute the contribution of each cluster to the next frame
     cluster_sizes_after = [cluster_counts_after[i] for i in labels_after_assigned] # i is a key in the dictionary of the counter /!\
     if DEBUG :
@@ -114,38 +67,145 @@ def optimal_assignment(labels_before, labels_after):
         print("# Normalised count matrix: \n", count_matrix)
 
     # Convert the matrix to a numpy array for the Hungarian algorithm
-    cost_matrix = count_matrix.to_numpy() 
+    cost_matrix = count_matrix.to_numpy() * -1 # We want to find the maximum of the contribution
+    # so we multiply by -1 to find the minimum of -1 * contribution (max f = min -f)
+    return cost_matrix, labels_before_assigned, labels_after_assigned
+
+
+def to_square_matrix(matrix, noneValue):
+    """
+    Add imaginary clusters to make the cost matrix square. The
+    imaginary clusters are labeled as noneValue. The noise cluster is labeled -1.
+
+    Parameters
+    ----------
+    matrix : numpy array
+        Cost matrix
+    noneValue : int
+        Value of the imaginary clusters
+
+    Returns
+    -------
+    matrix : numpy array
+        Square matrix with imaginary clusters
+    """
+    if matrix.shape[0] < matrix.shape[1]:
+        diff = matrix.shape[1] - matrix.shape[0]
+        matrix = np.concatenate((matrix, np.full((diff, matrix.shape[1]), noneValue)) , axis=0)
+    elif matrix.shape[0] > matrix.shape[1]:
+        diff = matrix.shape[0] - matrix.shape[1]
+        matrix = np.concatenate((matrix, np.full((matrix.shape[0], diff), noneValue)), axis=1)
+    return matrix
+
+def unique_labels(labels, noise = -1, remove_noise_bool = True):
+    unique_labels = list(set(labels))
+    if noise in unique_labels and remove_noise_bool:
+        unique_labels.remove(noise)
+    return unique_labels
+
+def optimal_assignment(labels_before, labels_after, cost_matrix_func=contribution_matrix, **kwargsCostMatrix):
+    """
+    Optimal assignment of the clusters from the previous frame to the next frame. If the data is unbalanced, 
+    we add imaginary clusters to make the cost matrix square. Then, we use the Hungarian algorithm to find the optimal
+    assignment of the clusters from the previous frame to the next frame. 
+    
+    The imaginary clusters are labeled -2. The noise cluster is labeled -1. 
+    
+    Parameters
+    ----------
+    labels_before : numpy array
+        Labels of the clusters in the previous frame
+    labels_after : numpy array
+        Labels of the clusters in the next frame
+    cost_matrix_func : function
+        Function to compute the cost matrix. The function must return the cost matrix, 
+        the labels of the clusters in the previous frame after the optimal assignment, 
+        and the labels of the clusters in the next frame after the optimal assignment.
+    **kwargsCostMatrix : dict
+        Additional arguments for the cost matrix function
+        
+    Returns  
+    -------
+    labels_before_assigned : numpy array
+        Labels of the clusters in the previous frame after the optimal assignment
+    labels_after_assigned : numpy array
+        Labels of the clusters in the next frame after the optimal assignment   
+    contribution : numpy array
+        Contribution of each cluster to the next frame after the optimal assignment
+    """
+    if DEBUG:
+        print("Optimal assignment...")
+
+    ### === Preprocessing === ###
+    label_list_before = unique_labels(labels_before)
+    label_list_after = unique_labels(labels_after)
+
+    # Count the clusters 
+    n_cluster_before = len(label_list_before) 
+    n_cluster_after = len(label_list_after)
+
+    ### === Corner cases === ###
+    # Corner cases : no cluster in the previous or next frame
+    if n_cluster_after == 0:
+        # No cluster in the next frame
+        if DEBUG:
+            print(f"No cluster in the next frame :{Counter(labels_before)} ")
+        labels_before_assigned = label_list_before
+        labels_after_assigned = np.repeat(NoneFlock, n_cluster_before)
+        contribution = np.zeros(len(labels_before))
+        return labels_before_assigned, labels_after_assigned, contribution
+    
+    if n_cluster_before == 0:
+        # No cluster in the previous frame
+        if DEBUG:
+            print(f"No cluster in the previous frame :{Counter(labels_after)} ")
+        labels_before_assigned = np.repeat(NoneFlock, n_cluster_after)
+        labels_after_assigned = label_list_after
+        contribution = np.zeros(len(labels_after))
+        return labels_before_assigned, labels_after_assigned, contribution
+
+
+    if DEBUG:
+        print("Labels before: ", label_list_before)
+        print("Labels after: ", label_list_after)
+
+    ### === Cost matrix computation === ###
+    cost_matrix, labels_before_assigned, labels_after_assigned = cost_matrix_func(labels_before, labels_after, **kwargsCostMatrix)
     if DEBUG:
         print("Cost matrix: ", cost_matrix) 
+    cost_matrix = to_square_matrix(cost_matrix, 0)
 
-    # Convert the matrix into a square matrix 
-    if cost_matrix.shape[0] < cost_matrix.shape[1]: # more clusters in the next frame
-        diff = cost_matrix.shape[1] - cost_matrix.shape[0] # More columns than rows
-        cost_matrix = np.concatenate((cost_matrix, np.zeros((diff, cost_matrix.shape[1]))), axis=0)
-    elif cost_matrix.shape[0] > cost_matrix.shape[1]: # more clusters in the previous frame
-        diff = cost_matrix.shape[0] - cost_matrix.shape[1] # More rows than columns
-        cost_matrix = np.concatenate((cost_matrix, np.zeros((cost_matrix.shape[0], diff))), axis=1)
+    # Delete the clusters we added by making the cost matrix square
+    diff = np.abs(n_cluster_before - n_cluster_after)
+    if DEBUG:
+        print("Diff: ", diff)
+    if n_cluster_before < n_cluster_after:
+        labels_before_assigned = np.concatenate((labels_before_assigned, np.full(diff, NoneFlock))).astype(int)
+    elif n_cluster_before > n_cluster_after:
+        labels_after_assigned = np.concatenate((labels_after_assigned, np.ones(diff) * NoneFlock)).astype(int)
 
+    ### === Hungarian algorithm for optimal assignment === ###
     # Hungarian algorithm - Optimal assignment of the clusters from the previous frame to the next frame
-    assigned_row_indices, assigned_col_indices = linear_sum_assignment(cost_matrix, maximize=True)
+    assigned_row_indices, assigned_col_indices = linear_sum_assignment(cost_matrix)
     if DEBUG :
         print("Before index: ", assigned_row_indices)
         print("After  index: ", assigned_col_indices)
         print("Before Labels :", labels_before_assigned)
         print("After  Labels :", labels_after_assigned)
-        print("Cost matrix: ", cost_matrix[assigned_row_indices, assigned_col_indices])
+        print("Contribution : ", cost_matrix[assigned_row_indices, assigned_col_indices])
+
     contribution = cost_matrix[assigned_row_indices, assigned_col_indices]
 
-    
-    # Delete the clusters we added by making the cost matrix square
-    if n_cluster_before < n_cluster_after:
-        labels_before_assigned = np.concatenate((labels_before_assigned, np.zeros(n_cluster_after - n_cluster_before) - 2)).astype(int)
-    elif n_cluster_before > n_cluster_after:
-        labels_after_assigned = np.concatenate((labels_after_assigned, np.zeros(n_cluster_before - n_cluster_after) - 2)).astype(int)
 
+    ### === Postprocessing the labels assigned === ###
+    # Reorder the labels after the optimal assignment
+    labels_before_assigned = labels_before_assigned[assigned_row_indices]
+    labels_after_assigned = labels_after_assigned[assigned_col_indices]
     if DEBUG:
         print("Optimal assignment done.")
-    
+        print("Labels before assigned: ", labels_before_assigned)
+        print("Labels after assigned: ", labels_after_assigned)
+        print("Contribution: ", contribution)
     # Return the labels before and after the optimal assignment, and the contribution of each cluster to the next frame
     return labels_before_assigned, labels_after_assigned, contribution
 
@@ -153,6 +213,7 @@ def optimal_assignment(labels_before, labels_after):
 
 class Flocks: 
     id_counter = 0
+
     def __init__(self):
         self.id_list = []
         self.isAlive = []    
@@ -160,6 +221,7 @@ class Flocks:
         self.id_list.append(Flocks.id_counter)
         self.isAlive.append(True)
         new_id = Flocks.id_counter
+        # print(f"~~~ New flock created: {new_id} ~~~")
         Flocks.id_counter += 1
         return new_id
 
@@ -167,13 +229,17 @@ class Flocks:
         return Flocks.id_counter - 1
     
     def kill_flock(self, id):
+        # print(f"~~~ Flock {id} killed ~~~")
         self.isAlive[id] = False
 
     def reset_id_counter(self):
+        # print("~~~ Resetting id counter... ~~~")
         Flocks.id_counter = 0
     
     def __str__(self) -> str:
         txt = "Flocks: \n"
+        txt = f'Id: {self.id_list} \n'
+        txt += f'Is alive: {self.isAlive} \n'
         for id in self.id_list:
             if self.isAlive[id]:
                 txt += f"Flock {id} ; [ALIVE] "
@@ -181,11 +247,6 @@ class Flocks:
                 txt += f"Flock {id} ; [DEAD] "
             txt += "\n"
         
-        return txt
-
-    def print_tab(self):
-        txt = f'Flocks: {self.id_list} \n'
-        txt += f'Is alive: {self.isAlive} \n'
         return txt
 
 
@@ -230,31 +291,44 @@ if __name__ == "__main__":
         new = flocks.add_flock()
 
     # print("Flock objects created.", flocks) 
+    with open("history.txt", "w") as f:
+        for i in range(20):
+            f.write(f"####################### Iteration {i} #######################\n")
+            f.write(f"Labels before counter: {Counter(df_labels.iloc[i,:])}\n")
+            f.write(f"Cross tab with next : \n {pd.crosstab(df_labels.iloc[i,:], df_labels.iloc[i+1,:])}\n")
 
-    for i in range(df_labels.shape[0] - 1):
+
+    for i in range(20):
         ### === Iteration of optimal assignment === ###
         print(f'####################### Iteration {i} #######################')
-        print(f"Labels after counter: {Counter(df_labels.iloc[i+1,:])}")
-        print(f"Optimal assignment iteration {i}...")
-        # # Optimal assignment : computes the best permutation of the labels after the optimal assignment. 
+        if DEBUG:
+            print(f"Labels before counter: {Counter(df_labels.iloc[i,:])}")
+            print(f"Labels after counter: {Counter(df_labels.iloc[i+1,:])}")
+            print(f"Optimal assignment iteration {i}...")
+        # Optimal assignment : computes the best permutation of the labels after the optimal assignment. 
         labels_before = new_labels_matrix[i,:]
         labels_after = df_labels.iloc[i+1,:].to_numpy()
         before, after, contribution = optimal_assignment(labels_before, labels_after)
+
+        if DEBUG:
+            print("Result of the optimal assignment: ")
+            print(f"Before: {before}")
+            print(f"After: {after}")
+            print(f"Contribution: {contribution}")
+
         # Build the permutation of the labels after the optimal assignment
-        threshold = 0.
         replace_after = after.copy()
-        DEBUG = True
+        print("#### Renaming clusters...")
         for id, (id_before, id_after, contrib) in enumerate(zip(before, after, contribution)):
         
             if DEBUG:
-                print(f"{id} : Before: {id_before} ; After: {id_after} ; Contribution: {contrib}")
-            print(flocks)
-            print(flocks.print_tab())
+                print(f"### {id} : Before: {id_before} ; After: {id_after} ; Contribution: {contrib}")
+            # print(flocks.print_tab())
             # CASES : 
-            ## Contribution is below the threshold
+            ## Contribution is below the contributionThreshlod
             if id_before == NoneFlock and id_after != NoneFlock: 
                 new = flocks.add_flock()
-                replace_after[id_after] = new
+                replace_after[id] = new
                 if DEBUG:
                     print("New cluster! : ", new)
             ## Cluster died
@@ -262,33 +336,53 @@ if __name__ == "__main__":
                 if DEBUG:
                     print("Cluster died!")
                 flocks.kill_flock(id_before)
-                replace_after[id_after] = -1 # the flock is dead at next iteration
+                replace_after[id] = DeadFlock # We don't know where the cluster went : it may have fuse with another cluster, or just died
+                # We keep track of the cluster that died
                 # flocks.set_label_after(id_before, None)
             ## Cluster dies, another birth
-            elif contrib <= threshold:
-                flocks.kill_flock(id_before)
-                new = flocks.add_flock()
-                replace_after[id] = new
-                if DEBUG:
-                    print("Cluster died!, New cluster to be created.", new) 
-            ## Cluster continues : contribution above threshold
-            if contrib > threshold:
+            # elif contrib <= contributionThreshlod:
+            #     flocks.kill_flock(id_before)
+            #     new = flocks.add_flock()
+            #     replace_after[id] = new
+            #     if DEBUG:
+            #         print("Cluster died!, New cluster to be created.", new) 
+            ## Cluster continues : contribution above contributionThreshlod
+            else :
                 if DEBUG:
                     print("Cluster continues!")
                 replace_after[id] = id_before
                 # flocks.set_label_after(id_before, id_after)
-        print("-> Before permutation: ",after)
-        print("-> After  permutation: ",replace_after)
-        # label_dict = {label: new_label for label, new_label in zip(after, replace_after)}
-        # t_start = time.time()
-        # for label in label_dict:
-        #     mask = labels_after == label
-        #     new_labels_matrix[i+1,mask] = label_dict[label]
-        # t_end = time.time()
+        if DEBUG:
+            print("-> Before permutation: ",after)
+            print("-> After  permutation: ",replace_after)
+        label_dict = {label: new_label for label, new_label in zip(after, replace_after)}
+        # Remove the NoneFlock and DeadFlock from the dictionary 
+        # So it does not appear in the new labels matrix
+        label_dict = {label: new_label for label, new_label in label_dict.items() if new_label != NoneFlock and new_label != DeadFlock}
+        t_start = time.time()
+        if DEBUG:
+            print("-> Label dict: ", label_dict)
+        for label in label_dict:
+            mask = labels_after == label
+            new_labels_matrix[i+1,mask] = label_dict[label]
+        t_end = time.time()
         # print(f"Time taken (vector): {(t_end - t_start)*1000:.2f}ms")
-        # print("-> Former labels matrix: ", Counter(df_labels.iloc[i+1,:]))
-        # print("-> New labels matrix: ", Counter(new_labels_matrix[i+1,:]))
-        # DEBUG = False
-        if i >= 8:
-            wait = input("Press enter to continue...")
+        if DEBUG:
+            print("-> Former labels matrix: ", Counter(df_labels.iloc[i+1,:]))
+            print("-> New labels matrix: ", Counter(new_labels_matrix[i+1,:]))
 
+        print(flocks)
+        # new labels does not contain NoneFlock and DeadFlock
+        assert NoneFlock not in new_labels_matrix, "Erreur d'assignation des clusters (NoneFlock)"
+        assert DeadFlock not in new_labels_matrix, "Erreur d'assignation des clusters (DeadFlock)"
+        # if DEBUG:
+        #     wait = input("Press enter to continue...")
+
+
+    # Save the new labels matrix 
+    with open("new_labels_matrix.txt", "w") as f:
+        for i in range(new_labels_matrix.shape[0]):
+            f.write(f"####################### Iteration {i} #######################\n")
+            f.write(f"New labels matrix: {Counter(new_labels_matrix[i,:])}\n")
+            f.write(f"Labels before counter: {Counter(df_labels.iloc[i,:])}\n")
+            f.write("\n")
