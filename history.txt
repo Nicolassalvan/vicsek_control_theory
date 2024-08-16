@@ -1,52 +1,51 @@
 ####################### Iteration 0 #######################
-Labels before counter: Counter({0: 9, -1: 1})
+Labels before counter: Counter({0: 5, -1: 5})
 Cross tab with next : 
  1   -1   0
 0         
--1   1   0
- 0   0   9
+-1   2   3
+ 0   3   2
 ####################### Iteration 1 #######################
-Labels before counter: Counter({0: 9, -1: 1})
+Labels before counter: Counter({0: 5, -1: 5})
 Cross tab with next : 
  2   -1   0
 1         
--1   1   0
- 0   2   7
+-1   4   1
+ 0   0   5
 ####################### Iteration 2 #######################
-Labels before counter: Counter({0: 7, -1: 3})
+Labels before counter: Counter({0: 6, -1: 4})
 Cross tab with next : 
- 3   -1   0
-2         
--1   3   0
- 0   0   7
+ 3   0
+2    
+-1  4
+ 0  6
 ####################### Iteration 3 #######################
-Labels before counter: Counter({0: 7, -1: 3})
+Labels before counter: Counter({0: 10})
 Cross tab with next : 
- 4   -1   0
-3         
--1   3   0
- 0   0   7
+ 4  -1   0
+3        
+0   1   9
 ####################### Iteration 4 #######################
-Labels before counter: Counter({0: 7, -1: 3})
+Labels before counter: Counter({0: 9, -1: 1})
 Cross tab with next : 
  5   -1   0
 4         
--1   3   0
- 0   0   7
+-1   1   0
+ 0   0   9
 ####################### Iteration 5 #######################
-Labels before counter: Counter({0: 7, -1: 3})
+Labels before counter: Counter({0: 9, -1: 1})
 Cross tab with next : 
  6   -1   0
 5         
--1   3   0
- 0   0   7
+-1   1   0
+ 0   0   9
 ####################### Iteration 6 #######################
-Labels before counter: Counter({0: 7, -1: 3})
+Labels before counter: Counter({0: 9, -1: 1})
 Cross tab with next : 
  7   -1   0
 6         
--1   3   0
- 0   0   7
+-1   1   0
+ 0   2   7
 ####################### Iteration 7 #######################
 Labels before counter: Counter({0: 7, -1: 3})
 Cross tab with next : 
@@ -60,36 +59,35 @@ Cross tab with next :
  9   -1   0
 8         
 -1   1   1
- 0   0   8
+ 0   1   7
 ####################### Iteration 9 #######################
-Labels before counter: Counter({0: 9, -1: 1})
+Labels before counter: Counter({0: 8, -1: 2})
 Cross tab with next : 
  10  -1   0
 9         
--1   1   0
- 0   1   8
+-1   0   2
+ 0   1   7
 ####################### Iteration 10 #######################
-Labels before counter: Counter({0: 8, -1: 2})
+Labels before counter: Counter({0: 9, -1: 1})
 Cross tab with next : 
- 11  -1   0   1
-10            
--1   2   0   0
- 0   0   4   4
+ 11  -1   0
+10        
+-1   1   0
+ 0   0   9
 ####################### Iteration 11 #######################
-Labels before counter: Counter({0: 4, 1: 4, -1: 2})
+Labels before counter: Counter({0: 9, -1: 1})
 Cross tab with next : 
  12  -1   0
 11        
--1   2   0
- 0   0   4
- 1   0   4
+-1   0   1
+ 0   4   5
 ####################### Iteration 12 #######################
-Labels before counter: Counter({0: 8, -1: 2})
+Labels before counter: Counter({0: 6, -1: 4})
 Cross tab with next : 
  13  0  1
 12      
--1  2  0
- 0  4  4
+-1  0  4
+ 0  6  0
 ####################### Iteration 13 #######################
 Labels before counter: Counter({0: 6, 1: 4})
 Cross tab with next : 
@@ -100,42 +98,42 @@ Cross tab with next :
 ####################### Iteration 14 #######################
 Labels before counter: Counter({0: 6, 1: 4})
 Cross tab with next : 
- 15  0  1
-14      
-0   6  0
-1   0  4
+ 15  -1   0
+14        
+0    1   5
+1    1   3
 ####################### Iteration 15 #######################
-Labels before counter: Counter({0: 6, 1: 4})
+Labels before counter: Counter({0: 8, -1: 2})
 Cross tab with next : 
- 16  0  1
-15      
-0   6  0
-1   0  4
+ 16  -1   0
+15        
+-1   1   1
+ 0   0   8
 ####################### Iteration 16 #######################
-Labels before counter: Counter({0: 6, 1: 4})
+Labels before counter: Counter({0: 9, -1: 1})
 Cross tab with next : 
- 17  0  1
-16      
-0   6  0
-1   0  4
+ 17  -1   0
+16        
+-1   0   1
+ 0   5   4
 ####################### Iteration 17 #######################
-Labels before counter: Counter({0: 6, 1: 4})
+Labels before counter: Counter({-1: 5, 0: 5})
 Cross tab with next : 
- 18  0  1
-17      
-0   6  0
-1   0  4
+ 18  -1   0
+17        
+-1   2   3
+ 0   0   5
 ####################### Iteration 18 #######################
-Labels before counter: Counter({0: 6, 1: 4})
+Labels before counter: Counter({0: 8, -1: 2})
 Cross tab with next : 
- 19  0  1
-18      
-0   6  0
-1   0  4
+ 19  -1   0
+18        
+-1   2   0
+ 0   0   8
 ####################### Iteration 19 #######################
-Labels before counter: Counter({0: 6, 1: 4})
+Labels before counter: Counter({0: 8, -1: 2})
 Cross tab with next : 
- 20  0  1
-19      
-0   6  0
-1   0  4
+ 20  -1   0
+19        
+-1   2   0
+ 0   0   8

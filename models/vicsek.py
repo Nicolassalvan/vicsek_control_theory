@@ -3,6 +3,7 @@
 
 import numpy as np
 import models.model as model
+# import model as model
 
 
 class Vicsek(model.model):
@@ -41,6 +42,17 @@ class Vicsek(model.model):
         self.noiseAmplitude = noiseAmplitude
         self.numberOfParticles = numberOfParticles
         self.domainSize = np.asarray(domainSize)
+
+    def dict_params(self):
+        dict = {
+            "speed": self.speed,
+            "radius": self.radius,
+            "noiseAmplitude": self.noiseAmplitude,
+            "numberOfParticles": self.numberOfParticles,
+            "domainSize": self.domainSize,
+            "density": self.numberOfParticles / np.prod(self.domainSize)      
+        }
+        return dict
 
     def __normalizeOrientations(self,orientations):
         return orientations/(np.sqrt(np.sum(orientations**2,axis=1))[:,np.newaxis])
@@ -134,7 +146,6 @@ if __name__ == "__main__":
 
 
     print(simulationData[0].shape)
-    print(simulationData[1])
     print(simulationData[1].shape)
     print(simulationData[2].shape)
     # dump in csv

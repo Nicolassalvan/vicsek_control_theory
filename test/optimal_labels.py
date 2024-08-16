@@ -16,18 +16,16 @@ import time
 import models.vicsek as vicsek
 import visualisation as visualisation
 import utils
-import animation.Animator2D as Animator2D
-import animation.MatplotlibAnimator as MatplotlibAnimator
 
 
 ### === Constants === ###
 # True if we want to print debug information
 DEBUG = False
-
+# Constants for the NoneFlock and DeadFlock
 NoneFlock = -2
 DeadFlock = -3
-
-contributionThreshlod = 0.
+# Periodic boundary conditions
+L = 10
 
 
 def contribution_matrix(labels_before, labels_after):
@@ -70,6 +68,23 @@ def contribution_matrix(labels_before, labels_after):
     cost_matrix = count_matrix.to_numpy() * -1 # We want to find the maximum of the contribution
     # so we multiply by -1 to find the minimum of -1 * contribution (max f = min -f)
     return cost_matrix, labels_before_assigned, labels_after_assigned
+
+def centroid_distance_matrix(labels_before, labels_after, df_pos_before, df_pos_after, L = L): 
+    # Creating centroids 
+    gb_centroids_before = utils.get_centroids(df_pos_before, labels_before)
+    gb_centroids_after = utils.get_centroids(df_pos_after, labels_after)
+
+    dist = np.zeros((len(gb_centroids_before), len(gb_centroids_after)))
+    labels_before = gb_centroids_before.index
+    labels_after = gb_centroids_after.index
+    for i in range(len(gb_centroids_before)):
+        for j in range(len(gb_centroids_after)):
+            x_i, y_i = gb_centroids_before.iloc[i].x, gb_centroids_before.iloc[i].y
+            x_j, y_j = gb_centroids_after.iloc[j].x, gb_centroids_after.iloc[j].y
+            dist[i,j] = utils.distance_periodic(np.array([x_i, y_i]), np.array([x_j, y_j]), np.array([L, L]))
+
+    return dist, np.asarray(labels_before), np.asarray(labels_after)
+
 
 
 def to_square_matrix(matrix, noneValue):
@@ -249,26 +264,9 @@ class Flocks:
         
         return txt
 
-
-    
-
-
-if __name__ == "__main__":
-    ### === Importing the data === ###
-    # Get the data from the .csv files 
-    print("Importing data...")
-    df = pd.read_csv('data/vicsek.csv')
-    df_labels = pd.read_csv('data/vicsek_labels.csv')
-
-    if DEBUG:
-        # Test if we extracted the data correctly
-        print("Dataframe shape: ", df.shape)
-        print("Dataframe labels shape: ", df_labels.shape)
-
-        print("Dataframe head: ", df.head())
-        print("Dataframe labels head: ", df_labels.head())
-
-
+def correct_labels_optimal_assignment(df_labels_to_copy, df, option: str):
+    df_labels = df_labels_to_copy.copy()
+    assert "contribution" in option or "centroid" in option, "Option must be either 'contribution' or 'centroid'"
     ### === Initialisation of the algorithm === ###
 
     # Create a matrix for the new labels. Initiation with noise (-1)
@@ -283,33 +281,38 @@ if __name__ == "__main__":
     labels_before = df_labels.iloc[0,:].to_numpy()  
     labels_after = df_labels.iloc[1,:].to_numpy()
 
+    # Create the positions
+    df_pos_before = utils.get_positions(df, 0)
+    df_pos_after = utils.get_positions(df, 1)
+
     # Create the flock objects
-    print("Creating the flock objects...")
+    if DEBUG:
+        print("Creating the flock objects...")
     flocks = Flocks()
     flocks.reset_id_counter()
     for i in range(len(set(labels_before)) - 1):  
         new = flocks.add_flock()
 
-    # print("Flock objects created.", flocks) 
-    with open("history.txt", "w") as f:
-        for i in range(20):
-            f.write(f"####################### Iteration {i} #######################\n")
-            f.write(f"Labels before counter: {Counter(df_labels.iloc[i,:])}\n")
-            f.write(f"Cross tab with next : \n {pd.crosstab(df_labels.iloc[i,:], df_labels.iloc[i+1,:])}\n")
 
 
-    for i in range(20):
+    for i in range(df_labels.shape[0] - 1):
         ### === Iteration of optimal assignment === ###
-        print(f'####################### Iteration {i} #######################')
-        if DEBUG:
+        if DEBUG : 
+            print(f'####################### Iteration {i} #######################')
             print(f"Labels before counter: {Counter(df_labels.iloc[i,:])}")
             print(f"Labels after counter: {Counter(df_labels.iloc[i+1,:])}")
             print(f"Optimal assignment iteration {i}...")
         # Optimal assignment : computes the best permutation of the labels after the optimal assignment. 
         labels_before = new_labels_matrix[i,:]
         labels_after = df_labels.iloc[i+1,:].to_numpy()
-        before, after, contribution = optimal_assignment(labels_before, labels_after)
+        df_pos_before = utils.get_positions(df, i)
+        df_pos_after = utils.get_positions(df, i+1)
 
+        if option == "contribution":
+            before, after, contribution = optimal_assignment(labels_before, labels_after, cost_matrix_func=contribution_matrix)
+        elif option == "centroid":
+            before, after, contribution = optimal_assignment(labels_before, labels_after, cost_matrix_func=centroid_distance_matrix,
+                                                              df_pos_before=df_pos_before, df_pos_after=df_pos_after, L=L)
         if DEBUG:
             print("Result of the optimal assignment: ")
             print(f"Before: {before}")
@@ -318,14 +321,13 @@ if __name__ == "__main__":
 
         # Build the permutation of the labels after the optimal assignment
         replace_after = after.copy()
-        print("#### Renaming clusters...")
+        if DEBUG:
+            print("#### Renaming clusters..." )
         for id, (id_before, id_after, contrib) in enumerate(zip(before, after, contribution)):
         
             if DEBUG:
                 print(f"### {id} : Before: {id_before} ; After: {id_after} ; Contribution: {contrib}")
-            # print(flocks.print_tab())
             # CASES : 
-            ## Contribution is below the contributionThreshlod
             if id_before == NoneFlock and id_after != NoneFlock: 
                 new = flocks.add_flock()
                 replace_after[id] = new
@@ -338,20 +340,11 @@ if __name__ == "__main__":
                 flocks.kill_flock(id_before)
                 replace_after[id] = DeadFlock # We don't know where the cluster went : it may have fuse with another cluster, or just died
                 # We keep track of the cluster that died
-                # flocks.set_label_after(id_before, None)
-            ## Cluster dies, another birth
-            # elif contrib <= contributionThreshlod:
-            #     flocks.kill_flock(id_before)
-            #     new = flocks.add_flock()
-            #     replace_after[id] = new
-            #     if DEBUG:
-            #         print("Cluster died!, New cluster to be created.", new) 
             ## Cluster continues : contribution above contributionThreshlod
             else :
                 if DEBUG:
                     print("Cluster continues!")
                 replace_after[id] = id_before
-                # flocks.set_label_after(id_before, id_after)
         if DEBUG:
             print("-> Before permutation: ",after)
             print("-> After  permutation: ",replace_after)
@@ -359,30 +352,39 @@ if __name__ == "__main__":
         # Remove the NoneFlock and DeadFlock from the dictionary 
         # So it does not appear in the new labels matrix
         label_dict = {label: new_label for label, new_label in label_dict.items() if new_label != NoneFlock and new_label != DeadFlock}
-        t_start = time.time()
         if DEBUG:
             print("-> Label dict: ", label_dict)
         for label in label_dict:
             mask = labels_after == label
             new_labels_matrix[i+1,mask] = label_dict[label]
-        t_end = time.time()
-        # print(f"Time taken (vector): {(t_end - t_start)*1000:.2f}ms")
         if DEBUG:
             print("-> Former labels matrix: ", Counter(df_labels.iloc[i+1,:]))
             print("-> New labels matrix: ", Counter(new_labels_matrix[i+1,:]))
 
-        print(flocks)
         # new labels does not contain NoneFlock and DeadFlock
         assert NoneFlock not in new_labels_matrix, "Erreur d'assignation des clusters (NoneFlock)"
         assert DeadFlock not in new_labels_matrix, "Erreur d'assignation des clusters (DeadFlock)"
-        # if DEBUG:
-        #     wait = input("Press enter to continue...")
+        if DEBUG:
+            wait = input("Press enter to continue...")
 
 
     # Save the new labels matrix 
-    with open("new_labels_matrix.txt", "w") as f:
-        for i in range(new_labels_matrix.shape[0]):
-            f.write(f"####################### Iteration {i} #######################\n")
-            f.write(f"New labels matrix: {Counter(new_labels_matrix[i,:])}\n")
-            f.write(f"Labels before counter: {Counter(df_labels.iloc[i,:])}\n")
-            f.write("\n")
+    df_new_labels = pd.DataFrame(new_labels_matrix)
+    return df_new_labels
+    
+
+# TESTS 
+if __name__ == "__main__":
+    # ### === Importing the data === ###
+    # Get the data from the .csv files 
+    print("Importing data...")
+    df = pd.read_csv("data_test/vicsektest.csv")
+    df_labels = pd.read_csv("data_test/vicsek_labels_test.csv")
+    print("Data imported.")
+
+    # Save the new labels matrix 
+    print("Computing the new labels matrix with optimal assignment...")
+    df_new_labels = correct_labels_optimal_assignment(df_labels, df, option="contribution")
+    df_new_labels.to_csv("data/new_labels_matrix.csv", index=False)
+    df_new_labels.to_csv("data_test/new_labels_matrix.csv", index=False)
+    print("New labels matrix saved.")
