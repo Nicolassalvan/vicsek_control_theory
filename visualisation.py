@@ -4,12 +4,18 @@ import seaborn as sns
 import pandas as pd
 import utils as utils
 from matplotlib.animation import FuncAnimation
-
+import os 
 
 
 ### Animation ### 
 
-def animate_simulation2D_colored(df, labels,  L, plotBool = False, annotateBool = False, fps = 30):
+def animate_simulation2D_colored(df, labels,  L, plotBool = False, annotateBool = False, fps = 30, saveFolder = None):
+    saveInFolderBool = False
+    if saveFolder is not None:
+        if not os.path.exists(saveFolder):
+            os.makedirs(saveFolder)    
+        saveInFolderBool = True
+
     interval = int(1000/fps)
     df_x = df.filter(regex='^x')
     df_y = df.filter(regex='^y')
@@ -42,14 +48,23 @@ def animate_simulation2D_colored(df, labels,  L, plotBool = False, annotateBool 
 
         ax.set_xlim(0, L)
         ax.set_ylim(0, L)
-        plt.title('$t$=%2.2f' % time[i])
+        ax.set_title('$t$=%2.2f' % time[i])
+        if saveInFolderBool:
+            fig.savefig(saveFolder + f'frame_{i}.png')
 
     ani = FuncAnimation(fig, update_quiver_with_colors, frames = len(x), repeat=False , interval = interval)
     if plotBool:
         plt.show()
     return ani
 
-def animate_simulation2D(df, L, plotBool = False, fps = 30):
+def animate_simulation2D(df, L, plotBool = False, fps = 30, saveFolder = None):
+    saveInFolderBool = False
+    order = utils.order_factor(df)
+    if saveFolder is not None:
+        if not os.path.exists(saveFolder):
+            os.makedirs(saveFolder)    
+        saveInFolderBool = True
+
     interval = int(1000/fps)
 
     df_x = df.filter(regex='^x')
@@ -76,7 +91,9 @@ def animate_simulation2D(df, L, plotBool = False, fps = 30):
         ax.quiver(arrow_x, arrow_y, arrow_u, arrow_v)
         ax.set_xlim(0, L)
         ax.set_ylim(0, L)
-        plt.title('$t$=%2.2f' % time[i])
+        ax.set_title(f'$t$={time[i]:.2f}, order factor = {order[i]:.2f}')
+        if saveInFolderBool:
+            fig.savefig(saveFolder + f'frame_{i}.png')
 
     ani = FuncAnimation(fig, update_quiver, frames = len(x), repeat=False, interval = interval)
     if plotBool:

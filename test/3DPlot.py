@@ -17,9 +17,6 @@ import models.vicsek as vicsek
 from utils import *
 
 
-import animation.Animator2D as Animator2D
-import animation.MatplotlibAnimator as MatplotlibAnimator
-
 
 def animate_simulation_3D(simulationData, L):
 

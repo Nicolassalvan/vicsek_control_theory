@@ -2,7 +2,7 @@
 """
 
 Created on Fri Jun 21 15:11:06 2024
-@author: Ian Soede (S4385764), Nicolas Salvan (S6155197) at University of Groningen, Biomimitecs group
+@author: Nicolas Salvan (S6155197) - Ian Soede (S4385764), at University of Groningen, Biomimitecs group
 """
 import warnings
 import numpy as np

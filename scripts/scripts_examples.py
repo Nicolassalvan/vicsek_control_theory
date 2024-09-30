@@ -35,6 +35,7 @@ def progress(percent=0, width=30):
 # ============================= Binder Cumulant ============================== #
 ################################################################################
 
+# Study one parameter of the simulation, one simulation per parameters tuple 
 def plot_binder_cumulant():
     """
     Here is an example of how to plot some float coefficient depending on one parameter. You can modify the parameters to study, 
@@ -49,41 +50,45 @@ def plot_binder_cumulant():
     radius = 1 
     dt = 0.5
     tmax = 500
+    n_simulations = 20 # Nombre de simulations pour chaque couple de paramètres
     ### PARAMETERS TO STUDY ###
     constNoiseMin, constNoiseMax = 0, 2
-    constNoiseNumberOfPoints = 50
+    constNoiseNumberOfPoints = 100
     noiseArr = np.linspace(constNoiseMin, constNoiseMax, constNoiseNumberOfPoints)
-    binderArr = np.zeros(constNoiseNumberOfPoints)
+    binderArr = np.zeros((n_simulations, constNoiseNumberOfPoints))
 
     ### COMPUTATION ###
     # Compute binder cumulant 
-    for i, noiseAmplitude in enumerate(noiseArr) : 
-        # Create the model 
-        model = vicsek.Vicsek(numberOfParticles=N, domainSize=(L, L), radius=radius, noiseAmplitude=noiseAmplitude, speed=0.3)
-        # Simulate the model
-        simulationData = model.simulate(dt=dt, tmax=tmax)
-        df = utils.simulationDataToDataframe(simulationData)
-        # Compute the Binder Cumulant
-        binderArr[i] = utils.binder_cumulant(df)
-        # binderArr[i] = utils.stationnary_order_factor(df)
+    print(f"Computing {n_simulations * constNoiseNumberOfPoints} simulations...")
+    for i, noiseAmplitude in enumerate(noiseArr) : # for each parameter tuple
+        for sample in range(n_simulations):
+            # Create the model 
+            model = vicsek.Vicsek(numberOfParticles=N, domainSize=(L, L), radius=radius, noiseAmplitude=noiseAmplitude, speed=0.3)
+            # Simulate the model
+            simulationData = model.simulate(dt=dt, tmax=tmax)
+            df = utils.simulationDataToDataframe(simulationData)
+            # Compute the Order Factor
+            binderArr[sample][i] = utils.stationnary_order_factor(df)
         percentage = (i/constNoiseNumberOfPoints)*100
         progress(int(percentage))
+    print("Done B)")
     # look for a critical point 
-    binderDerivative = np.gradient(binderArr) 
-    criticalNoise = noiseArr[np.argmax(binderDerivative * binderDerivative)]
-    criticalBinder = binderArr[np.argmax(binderDerivative * binderDerivative)]
-    print(f'Critical point : {criticalBinder}')
+    binderMean = np.mean(binderArr, axis=0)
+    binderSTD = np.std(binderArr, axis=0)
+
 
     ### PLOT ###
     fig, ax = plt.subplots()
-    ax.plot(noiseArr, binderArr) 
+    ax.plot(noiseArr, binderMean, label = 'Binder Cumulant') 
+    ax.errorbar(noiseArr, binderMean, yerr = binderSTD)
+
     # Customizing the plot 
     ax.set(
         xlabel='Noise Amplitude',
         ylabel='Binder Cumulant',
         title='Binder Cumulant as a function of Noise Amplitude'
     )
-    ax.scatter(criticalNoise, criticalBinder, color='red', label=f'Crit: {criticalNoise:.2f}, {criticalBinder:.2f}')
+    # ax.scatter(criticalNoise, criticalBinder, color='red', label=f'Crit: {criticalNoise:.2f}, {criticalBinder:.2f}')
     ax.legend()
 
 
@@ -99,12 +104,13 @@ def plot_binder_cumulant():
     plt.show(block = False)
 
     ### SAVING IN .CSV ### 
-    df_res = pd.DataFrame({'Noise Amplitude': noiseArr, 'Binder Cumulant': binderArr})
-    df_res.to_csv('binder_cumulant.csv', index=False)
+    # df_res = pd.DataFrame({'Noise Amplitude': noiseArr, 'Binder Cumulant': binderArr})
+    # df_res.to_csv('binder_cumulant.csv', index=False)
 
 ################################################################################
 # ========================= Stationnary Order Factor ========================= #
 ################################################################################
+# Study one parameter of the simulation, n_simulations simulations for each parameter tuple 
 def plot_stationnary_order():
     """
     Here is an example of how to plot some float coefficient depending on one parameter. You can modify the parameters to study, 
@@ -118,57 +124,81 @@ def plot_stationnary_order():
     L = 10
     radius = 1 
     dt = 0.5
-    tmax = 500
+    tmax = 10
+    n_simulations = 20 # Nombre de simulations pour chaque couple de paramètres 
     ### PARAMETERS TO STUDY ###
     constNoiseMin, constNoiseMax = 0, 2
-    constNoiseNumberOfPoints = 50
+    constNoiseNumberOfPoints = 100
     noiseArr = np.linspace(constNoiseMin, constNoiseMax, constNoiseNumberOfPoints)
-    orderArr = np.zeros(constNoiseNumberOfPoints)
-
+    orderArr = np.zeros((n_simulations, constNoiseNumberOfPoints))
+    
     ### COMPUTATION ###
     # Compute binder cumulant 
-    for i, noiseAmplitude in enumerate(noiseArr) : 
-        # Create the model 
-        model = vicsek.Vicsek(numberOfParticles=N, domainSize=(L, L), radius=radius, noiseAmplitude=noiseAmplitude, speed=0.3)
-        # Simulate the model
-        simulationData = model.simulate(dt=dt, tmax=tmax)
-        df = utils.simulationDataToDataframe(simulationData)
-        # Compute the Order Factor
-        orderArr[i] = utils.stationnary_order_factor(df)
+    print(f"Computing {n_simulations * constNoiseNumberOfPoints} simulations...")
+    for i, noiseAmplitude in enumerate(noiseArr) : # for each parameter tuple
+        for sample in range(n_simulations):
+            # Create the model 
+            model = vicsek.Vicsek(numberOfParticles=N, domainSize=(L, L), radius=radius, noiseAmplitude=noiseAmplitude, speed=0.3)
+            # Simulate the model
+            simulationData = model.simulate(dt=dt, tmax=tmax)
+            df = utils.simulationDataToDataframe(simulationData)
+            # Compute the Order Factor
+            orderArr[sample][i] = utils.stationnary_order_factor(df)
         percentage = (i/constNoiseNumberOfPoints)*100
         progress(int(percentage))
-    # look for a critical point 
-    binderDerivative = np.gradient(orderArr) 
-    criticalNoise = noiseArr[np.argmax(binderDerivative * binderDerivative)]
-    criticalOrder = orderArr[np.argmax(binderDerivative * binderDerivative)]
-    print(f'Critical point : {criticalOrder}')
+    print("Done B)")
+    print(orderArr)
+    orderArrMean = np.mean(orderArr, axis=0)
+    orderArrSTD = np.std(orderArr, axis=0) 
+    print(orderArrMean.shape)
+    print(orderArrSTD.shape)
+    print(noiseArr.shape)
 
-    ### PLOT ###
+    # # look for a critical point for each simulation 
+    orderMeanDerivative = np.gradient(orderArrMean)
+    criticalIndex = np.argmax(orderMeanDerivative * orderMeanDerivative)
+    criticalNoise = noiseArr[criticalIndex]
+    criticalOrder = orderArrMean[criticalIndex]
+    print(f'Critical point : {criticalNoise} {criticalOrder}')
+
+    # ### PLOT ###
     fig, ax = plt.subplots()
-    ax.plot(noiseArr, orderArr) 
+    ax.plot(noiseArr, orderArrMean) 
+    ax.errorbar(noiseArr, orderArrMean, yerr = orderArrSTD)
     # Customizing the plot 
     ax.set(
         xlabel='Noise Amplitude',
         ylabel='Stationnary Order Factor',
-        title='Stationnary order factor as a function of Noise Amplitude'
+        title='Stationnary order factor as a function of Noise Amplitude, many simulations'
     )
     ax.scatter(criticalNoise, criticalOrder, color='red', label=f'Crit: {criticalNoise:.2f}, {criticalOrder:.2f}')
     ax.legend()
 
 
-    ### SAVING PLOT ###
-    # ADD DESCRIPTION : Parameters, etc.
+    # ### SAVING PLOT ###
+    # # ADD DESCRIPTION : Parameters, etc.
     imageDescription = 'Stationnary Order Factor as a function of Noise Amplitude \n'
     imageDescription += 'N = ' + str(N) + ', L = ' + str(L) + ', radius = ' + str(radius) + ', dt = ' + str(dt) + ', tmax = ' + str(tmax)
     imageDescription += 'rho = ' + str(N/(L*L)) + '\n'
+    imageDescription += 'n_simulations = ' + str(n_simulations)
 
     fig.text(0, 0, imageDescription, va='top')
     fig.tight_layout()
     fig.savefig('order.png', bbox_inches='tight')
     plt.show(block = False)
 
-    ### SAVING IN .CSV ### 
-    df_res = pd.DataFrame({'Noise_Amplitude': noiseArr, 'Order_Factor': orderArr})
+    # ### SAVING IN .CSV ###   
+    # resMat = [[noiseArr, orderArr[:, n]] for n in range(n_simulations)]    
+    noiseMat = np.zeros((n_simulations, constNoiseNumberOfPoints))
+    for sim in range(n_simulations): 
+        noiseMat[sim] = noiseArr
+    df_res = pd.DataFrame(
+        {
+            'Noise' : noiseMat.reshape(n_simulations * constNoiseNumberOfPoints), 
+            'Stationnary_order_factor' : orderArr.reshape(n_simulations * constNoiseNumberOfPoints)
+        }
+    ) 
+
     df_res.to_csv('order.csv', index=False)
 
 
@@ -176,14 +206,14 @@ def heatmap_stationnary_order_factor():
     ### PARAMETERS ###
     L = 10
     radius = 1 
-    dt = 0.1
-    tmax = 500
+    dt = 1.
+    tmax = 1000
     ### PARAMETERS TO STUDY ###
-    constNoiseMin, constNoiseMax = 0, 1
-    constNoiseNumberOfPoints = 20
+    constNoiseMin, constNoiseMax = 0, 3
+    constNoiseNumberOfPoints = 35
     noiseArr = np.linspace(constNoiseMin, constNoiseMax, constNoiseNumberOfPoints)
-    constNmin, constNmax = 10, 100
-    constNnumberOfPoints = 20
+    constNmin, constNmax = 10, 300
+    constNnumberOfPoints = 35
     NArr = np.linspace(constNmin, constNmax, constNnumberOfPoints, dtype=int)
 
     ### COMPUTATION ###
@@ -192,7 +222,7 @@ def heatmap_stationnary_order_factor():
     for i, N in enumerate(NArr) : 
         for j, noiseAmplitude in enumerate(noiseArr) : 
             # # Create the model 
-            model = vicsek.Vicsek(numberOfParticles=N, domainSize=(L, L), radius=radius, noiseAmplitude=noiseAmplitude, speed=0.3)
+            model = vicsek.Vicsek(numberOfParticles=N, domainSize=(L, L), radius=radius, noiseAmplitude=noiseAmplitude, speed=0.03)
             # # Simulate the model
             simulationData = model.simulate(dt=dt, tmax=tmax)
             df = utils.simulationDataToDataframe(simulationData)
@@ -208,8 +238,10 @@ def heatmap_stationnary_order_factor():
     # Customizing the plot
     ax.set(
         xlabel='Noise Amplitude',
-        ylabel='Particle Density',
-        title='Stationnary Order Factor as a function of Noise Amplitude and Number of Particles'
+        ylabel='Number of particles (proportional to density)',
+        title='Stationnary Order Factor as a function of Noise Amplitude and Number of Particles in Vicsek Model',
+        xticks = [],
+        yticks = []
     )
 
     ### SAVING PLOT ###
@@ -217,6 +249,7 @@ def heatmap_stationnary_order_factor():
     # ADD DESCRIPTION : Parameters, etc.
     imageDescription = 'Stationnary Order Factor as a function of Noise Amplitude and Number of Particles \n'
     imageDescription += 'L = ' + str(L) + ', radius = ' + str(radius) + ', dt = ' + str(dt) + ', tmax = ' + str(tmax) + '\n'
+    imageDescription += 'N' + str(constNmin) + ' to ' + str(constNmax) + ', noise ' + str(constNoiseMin) + ' to ' + str(constNoiseMax) + '\n'
     fig.text(0, 0, imageDescription, va='top')
     fig.tight_layout()
     fig.savefig('stationnary_order.png', bbox_inches='tight')
@@ -233,4 +266,5 @@ if __name__ == '__main__':
     # heatmap_stationnary_order_factor() 
     print("Starting...")
     # plot_binder_cumulant()
-    plot_stationnary_order()
+    heatmap_stationnary_order_factor()
+    # plot_stationnary_order()
